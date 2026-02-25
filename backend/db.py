@@ -1,7 +1,7 @@
 from sqlmodel import SQLModel, Session, create_engine
 import models
 # SQLite file will be created in the backend folder as app.db
-sqlite_file_name = "app.db"
+sqlite_file_name = "./data/app.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
 engine = create_engine(
