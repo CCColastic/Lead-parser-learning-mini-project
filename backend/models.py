@@ -24,3 +24,15 @@ class Interaction(SQLModel, table=True):
 
     status: str = "ok"  # "ok" or "error"
     error_message: Optional[str] = None
+    
+class LeadExtracted(SQLModel):
+    """
+    Response model for /api/extract.
+    This is NOT a table (no table=True). It's a validation/response schema.
+    """
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    company: Optional[str] = None
+    request_summary: Optional[str] = None
+    urgency: Optional[str] = None
