@@ -16,7 +16,7 @@ from slowapi import _rate_limit_exceeded_handler
 
 from db import create_db_and_tables, get_session
 from llm import call_and_parse_lead
-from models import Interaction, LeadExtracted
+from models import Interaction, InteractionOut, LeadExtracted
 
 
 @asynccontextmanager
@@ -48,12 +48,36 @@ def health():
     return {"ok": True}
 
 
-@app.get("/api/history")
+@app.get("/api/history", response_model=list[InteractionOut])
 def history(limit: int = 50, session: Session = Depends(get_session)):
     limit = max(1, min(limit, 200))
     statement = select(Interaction).order_by(desc(col(Interaction.id))).limit(limit)
     rows = session.exec(statement).all()
-    return rows
+
+    out: list[InteractionOut] = []
+
+    for r in rows:
+        parsed_obj = None
+        if r.parsed_json:
+            try:
+                parsed_obj = LeadExtracted.model_validate(json.loads(r.parsed_json))
+            except Exception:
+                # If parsing fails, we still return the raw parsed_json string.
+                parsed_obj = None
+
+        out.append(
+            InteractionOut(
+                id=r.id or 0,
+                created_at=r.created_at,
+                input_text=r.input_text,
+                status=r.status,
+                error_message=r.error_message,
+                parsed_json=r.parsed_json,
+                parsed=parsed_obj,
+            )
+        )
+
+    return out
 
 
 @app.delete("/api/history")
