@@ -3,10 +3,16 @@ from datetime import datetime
 import json
 import os
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import desc
 from sqlmodel import Session, col, select, delete
+
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 
 from db import create_db_and_tables, get_session
 from llm import call_and_parse_lead
@@ -19,7 +25,18 @@ async def lifespan(app: FastAPI):
     yield
 
 
+# 1) Create limiter (key function decides how we identify a client: here by IP)
+limiter = Limiter(key_func=get_remote_address)
+
+# 2) Attach limiter to app.state (SlowAPI integration requirement)
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
+
+# 3) Add middleware that intercepts requests and enforces limits
+app.add_middleware(SlowAPIMiddleware)
+
+# 4) Register exception handler so RateLimitExceeded becomes a proper 429 response
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 class ExtractRequest(BaseModel):
@@ -72,8 +89,14 @@ def seed(session: Session = Depends(get_session)):
     }
 
 
+# Rate limit: 5 requests per minute per IP (tune later)
 @app.post("/api/extract", response_model=LeadExtracted)
-def extract(req: ExtractRequest, session: Session = Depends(get_session)):
+@limiter.limit("5/minute")
+def extract(request: Request, req: ExtractRequest, session: Session = Depends(get_session)):
+    """
+    Main endpoint: calls DeepSeek and returns structured JSON.
+    Rate limited to protect cost & stability.
+    """
     text = (req.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="text is required")
@@ -82,8 +105,6 @@ def extract(req: ExtractRequest, session: Session = Depends(get_session)):
 
     try:
         raw, parsed = call_and_parse_lead(text, model=model, max_retries=2)
-
-        # Validate that parsed JSON matches our expected schema
         extracted = LeadExtracted.model_validate(parsed)
 
         interaction = Interaction(
@@ -99,7 +120,6 @@ def extract(req: ExtractRequest, session: Session = Depends(get_session)):
         return extracted
 
     except Exception as e:
-        # Store failure for debugging
         interaction = Interaction(
             input_text=text,
             raw_model_output="",
@@ -109,5 +129,4 @@ def extract(req: ExtractRequest, session: Session = Depends(get_session)):
         )
         session.add(interaction)
         session.commit()
-
         raise HTTPException(status_code=500, detail=str(e))
