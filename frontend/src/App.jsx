@@ -4,9 +4,9 @@ import "./App.css";
 export default function App() {
   const [text, setText] = useState("");
   const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function loadHistory() {
     const res = await fetch("/api/history?limit=20");
@@ -16,13 +16,14 @@ export default function App() {
   }
 
   useEffect(() => {
-    loadHistory().catch((err) => setError(String(err.message || err)));
+    loadHistory().catch((e) => setError(String(e.message || e)));
   }, []);
 
   async function onExtract() {
     setLoading(true);
     setError("");
     setResult(null);
+
     try {
       const res = await fetch("/api/extract", {
         method: "POST",
@@ -32,12 +33,14 @@ export default function App() {
 
       const body = await res.json().catch(() => ({}));
 
-      if (!res.ok)
+      if (!res.ok) {
         throw new Error(body.detail || `Extract failed: ${res.status}`);
+      }
+
       setResult(body);
       await loadHistory();
-    } catch (err) {
-      setError(String(err.message || err));
+    } catch (e) {
+      setError(String(e.message || e));
     } finally {
       setLoading(false);
     }
@@ -46,13 +49,14 @@ export default function App() {
   async function onClearHistory() {
     setLoading(true);
     setError("");
+
     try {
       const res = await fetch("/api/history", { method: "DELETE" });
       if (!res.ok) throw new Error(`Clear failed: ${res.status}`);
       await loadHistory();
       setResult(null);
-    } catch (err) {
-      setError(String(err.message || err));
+    } catch (e) {
+      setError(String(e.message || e));
     } finally {
       setLoading(false);
     }
