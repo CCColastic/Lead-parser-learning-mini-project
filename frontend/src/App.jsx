@@ -116,26 +116,64 @@ export default function App() {
         <h2>History (latest 20)</h2>
         <ul style={{ paddingLeft: 18 }}>
           {history.map((h) => (
-            <li key={h.id} style={{ marginBottom: 14 }}>
+            <li key={h.id} style={{ marginBottom: 18 }}>
               <div>
                 <strong>#{h.id}</strong> [{h.status}]{" "}
                 <small>{h.created_at}</small>
               </div>
 
-              <div style={{ whiteSpace: "pre-wrap" }}>{h.input_text}</div>
+              <div style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+                {h.input_text}
+              </div>
 
-              {h.parsed_json && (
-                <div style={{ marginTop: 6 }}>
-                  <small>parsed_json saved (string in DB)</small>
+              {h.parsed && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 12, opacity: 0.8 }}>parsed</div>
+                  <pre
+                    style={{
+                      background: "#111",
+                      color: "#0f0",
+                      padding: 12,
+                      overflowX: "auto",
+                    }}
+                  >
+                    {JSON.stringify(h.parsed, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {!h.parsed && h.parsed_json && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 12, opacity: 0.8 }}>
+                    parsed_json (string; parse failed or not validated)
+                  </div>
+                  <pre
+                    style={{
+                      background: "#222",
+                      color: "#ddd",
+                      padding: 12,
+                      overflowX: "auto",
+                    }}
+                  >
+                    {h.parsed_json}
+                  </pre>
                 </div>
               )}
 
               {h.error_message && (
-                <div style={{ color: "crimson" }}>{h.error_message}</div>
+                <div style={{ marginTop: 10, color: "crimson" }}>
+                  {h.error_message}
+                </div>
               )}
             </li>
           ))}
         </ul>
+
+        {history.length === 0 && (
+          <div style={{ marginTop: 12, opacity: 0.7 }}>
+            No history yet. Run Extract to create entries.
+          </div>
+        )}
       </div>
     </div>
   );
